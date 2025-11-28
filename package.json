@@ -4,9 +4,9 @@
   "description": "Cloudflare Worker to proxy R2 storage access and prevent direct link abuse",
   "main": "index.js",
   "scripts": {
-    "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "start": "wrangler dev"
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
   "keywords": [
     "cloudflare",

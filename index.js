@@ -98,7 +98,8 @@ export async function handleRequest(request, env) {
             });
         }
 
-        // Get the object from R2
+        // Get the object from R2 using the environment binding
+        // The R2 bucket binding is configured via environment variables in the Cloudflare dashboard
         const object = await env.R2_BUCKET.getObject(objectKey);
 
         if (object === null) {
@@ -222,7 +223,7 @@ async function checkRateLimit(env, ip, accessType) {
         const windowStart = await env.RATE_LIMIT_KV.get(windowKey) || '0';
 
         const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
-        const windowSize = parseInt(env.RATE_LIMIT_WINDOW || '900'); // Default 15 min
+        const windowSize = parseInt(env.RATE_LIMIT_WINDOW || '900'); // Default 15 min (900 seconds)
         const maxRequests = parseInt(env.MAX_REQUESTS_PER_WINDOW || '100'); // Default 100 requests
 
         // Check if we're still in the same window

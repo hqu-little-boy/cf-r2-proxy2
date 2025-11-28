@@ -34,6 +34,13 @@ function runTests() {
     console.log('  1. Upload code to a GitHub repository');
     console.log('  2. Connect to Cloudflare Workers via Git integration');
     console.log('  3. Configure environment variables and bindings in the dashboard');
+    console.log('  4. Use "npm install" as the build command');
+    console.log('     Important environment variables include:');
+    console.log('     - R2_BUCKET_NAME: Your R2 bucket name');
+    console.log('     - PROXY_SECRET: Access key (use a strong password)');
+    console.log('     - RATE_LIMIT_WINDOW: Rate limit window (optional)');
+    console.log('     - MAX_REQUESTS_PER_WINDOW: Max requests per window (optional)');
+    console.log('  Note: All config info is set in Cloudflare dashboard, not in code');
     console.log('');
     console.log('Option 2 - Command Line Deployment:');
     console.log('  1. Update wrangler.toml with your Cloudflare account details');
