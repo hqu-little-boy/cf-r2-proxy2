@@ -1,66 +1,49 @@
 # Cloudflare R2 Proxy
 
-Cloudflare Worker to proxy R2 storage access and prevent direct link abuse.
+A Cloudflare Worker that acts as a proxy for Cloudflare R2 storage to prevent direct access and potential abuse while providing public access to your stored files.
 
 ## Features
 
-- Authentication via secret key for protected files
-- Rate limiting to prevent abuse
-- MIME type detection (now supporting .sqlite, .db, .exe, .dll, .lib and more)
-- Security headers
-- Content disposition control
-- Input validation to prevent directory traversal
+- Prevents direct R2 access to avoid unauthorized usage and costs
+- Maintains public access to your files through the worker
+- Supports multiple file types (images, documents, videos, audio, archives, etc.)
+- Correctly handles MIME types for different file extensions
+- Forces download for executable and database files for security
+- Supports range requests for video/audio streaming
+- Implements caching headers for better performance
+- Provides error handling for missing files
 
-## 部署方式
+## How It Works
 
-### 方法一：通过 GitHub 在 Cloudflare 网页中部署（推荐）
+This worker intercepts requests and fetches objects from R2 storage, returning them to the client. This way, your R2 bucket doesn't need to be publicly accessible, helping to prevent unauthorized direct access.
 
-1. 将此项目代码上传到您的 GitHub 仓库
-2. 登录 Cloudflare 控制面板
-3. 选择 "Workers & Pages" -> "Create application" -> "Workers" -> "Connect to Git"
-4. 连接您的 GitHub 账户并选择仓库
-5. 在设置中配置环境变量和 R2/KV 绑定
-6. 点击 "Save and Deploy"
+## Deployment
 
-**配置说明：**
-- 构建命令使用：`npm install`（避免部署命令中的配置错误）
-- 需要在 Cloudflare 控制台中配置的环境变量包括：
-  - `R2_BUCKET_NAME`: 您的 R2 存储桶名称
-  - `PROXY_SECRET`: 访问密钥（非常重要，请使用强密码）
-  - `RATE_LIMIT_WINDOW`: 速率限制窗口（可选，默认为 900）
-  - `MAX_REQUESTS_PER_WINDOW`: 最大请求数（可选，默认为 100）
+Follow the detailed deployment instructions in [部署文档.md](部署文档.md) to deploy this to your Cloudflare account.
 
-**服务绑定（在 Cloudflare 控制台中配置）：**
-- R2 绑定: 变量名 `R2_BUCKET`，绑定到您的 R2 存储桶
-- KV 绑定: 变量名 `RATE_LIMIT_KV`，绑定到您的 KV 命名空间
+## Post-Deployment Configuration
 
-**优势：**
-- 避免了账户 ID 和 Worker 名称不匹配的错误
-- 配置信息在 Cloudflare 控制台中管理，更安全
-- 无需在代码中存储敏感信息
+After deploying through the Cloudflare dashboard, you must configure the R2 binding:
 
-### 方法二：命令行部署
+1. Go to your worker's Settings
+2. Find "R2 Bindings" section
+3. Add a new binding with:
+   - Variable name: `R2_BUCKET`
+   - Bucket name: Your R2 bucket name
+4. Save and deploy
 
-运行 `wrangler deploy` 命令进行部署
+See [CONFIGURATION.md](CONFIGURATION.md) for detailed post-deployment steps.
 
-## 使用方法
+## Usage
 
-### 公开文件访问:
-```
-https://your-worker.your-subdomain.workers.dev/path/to/file
-```
+After deployment and configuration, access your R2 files using:
+`https://your-worker.your-subdomain.workers.dev/path/to/file`
 
-### 受保护文件访问:
-```
-https://your-worker.your-subdomain.workers.dev/protected/path/to/file?secret=your-secret-key
-```
+For example, to access an image stored as `images/photo.jpg` in your R2 bucket, use:
+`https://your-worker.your-subdomain.workers.dev/images/photo.jpg`
 
-## Supported File Types
+## Requirements
 
-- Images: jpg, jpeg, png, gif, svg, webp, ico
-- Documents: pdf, doc, docx, txt, html, css, js
-- Video: mp4, webm, ogg
-- Audio: mp3, wav, flac, aac
-- Archives: zip, csv
-- Databases: sqlite, db
-- Executables: exe, dll, lib
+- Cloudflare account
+- R2 storage bucket
+- GitHub account (for dashboard deployment)

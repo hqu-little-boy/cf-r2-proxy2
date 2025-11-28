@@ -1,23 +1,22 @@
 {
   "name": "cf-r2-proxy",
   "version": "1.0.0",
-  "description": "Cloudflare Worker to proxy R2 storage access and prevent direct link abuse",
-  "main": "index.js",
+  "description": "A Cloudflare Worker to proxy R2 storage requests and prevent direct access",
+  "main": "src/index.js",
   "scripts": {
-    "dev": "wrangler dev",
-    "start": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
   },
   "keywords": [
     "cloudflare",
-    "worker",
     "r2",
     "proxy",
-    "security"
+    "storage"
   ],
-  "author": "Your Name",
+  "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20230914.0",
     "wrangler": "^3.0.0"
   }
 }

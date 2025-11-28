@@ -1,6 +1,9 @@
-name = "r2-proxy"  # This can be changed in Cloudflare dashboard when using Git integration
-main = "index.js"
+name = "cf-r2-proxy"
+main = "src/index.js"
 compatibility_date = "2023-07-01"
 
-# Environment variables and service bindings are configured in the Cloudflare dashboard
-# when using Git integration, so they are not specified here
+# R2 bucket binding - this will be configured in the Cloudflare dashboard
+# after deployment when connecting your R2 bucket
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "YOUR_BUCKET_NAME"
