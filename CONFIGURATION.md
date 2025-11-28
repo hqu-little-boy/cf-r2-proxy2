@@ -22,7 +22,7 @@
 
 配置完成后，您可以进行以下测试：
 
-1. 访问 `https://your-worker.your-subdomain.workers.dev/` 
+1. 访问 `https://your-worker.your-subdomain.workers.dev/`
    - 如果显示 "R2 Proxy Worker is running. Access your R2 files via /path/to/file"，说明 Worker 工作正常
    - 如果显示 "R2 binding not configured. Please check your worker settings."，说明 R2 绑定未正确设置
 
@@ -30,26 +30,23 @@
    - 例如 `https://your-worker.your-subdomain.workers.dev/path/to/your/file.jpg`
    - 如果能正常访问，说明配置成功
 
-### 3. 修改配置文件（可选）
+### 3. 关于配置文件
 
-在部署后，您也可以回到 GitHub 仓库中修改 `wrangler.toml` 文件：
+**重要说明**：我们的 `wrangler.toml` 文件中没有预设 bucket 名称，这是为了确保部署可以成功进行。R2 绑定将在 Cloudflare 仪表板中完成，而不是通过配置文件完成。
 
-1. 在 GitHub 仓库中找到 `wrangler.toml`
-2. 将 `YOUR_BUCKET_NAME` 替换为您实际的 R2 存储桶名称
-3. 保存更改
+如果您希望在配置文件中指定 bucket 名称（可选），可以修改 `wrangler.toml` 文件：
 
-更新后的配置文件应如下所示：
 ```toml
 name = "cf-r2-proxy"
 main = "src/index.js"
 compatibility_date = "2023-07-01"
 
-# R2 bucket binding - this will be configured in the Cloudflare dashboard
-# after deployment when connecting your R2 bucket
 [[r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "your-actual-bucket-name"
 ```
+
+但是，如果您直接在配置文件中指定 bucket 名称，必须确保该名称在您账户中确实存在，否则部署将失败。
 
 ### 4. 故障排除
 
