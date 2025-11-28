@@ -1,0 +1,19 @@
+name = "r2-proxy"
+main = "index.js"
+compatibility_date = "2023-07-01"
+account_id = "your-account-id"  # Replace with your Cloudflare account ID
+
+[vars]
+R2_BUCKET_NAME = "your-r2-bucket-name"  # Replace with your R2 bucket name
+PROXY_SECRET = "your-secret-key"  # Secret key for accessing protected files
+RATE_LIMIT_WINDOW = "900"  # 15 minutes in seconds
+MAX_REQUESTS_PER_WINDOW = "100"  # Max requests per window
+
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "your-r2-bucket-name"  # Replace with your R2 bucket name
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "your-kv-namespace-id"  # Replace with your actual KV namespace ID
+preview_id = "your-preview-kv-namespace-id"  # Replace with your preview KV namespace ID
