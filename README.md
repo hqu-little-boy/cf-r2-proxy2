@@ -1,121 +1,49 @@
-# Cloudflare R2 Proxy Worker
+# Cloudflare R2 Proxy
 
-A Cloudflare Worker that acts as a proxy for Cloudflare R2 storage to prevent direct link access and potential bandwidth abuse.
+Cloudflare Worker to proxy R2 storage access and prevent direct link abuse.
 
 ## Features
 
-- **Authentication**: Access protected files with a secret key
-- **Rate Limiting**: Prevents abuse by limiting requests per IP
-- **MIME Type Detection**: Automatically detects content types
-- **Security Headers**: Includes essential security headers
-- **Content Disposition Control**: Forcing download for protected files
+- Authentication via secret key for protected files
+- Rate limiting to prevent abuse
+- MIME type detection (now supporting .sqlite, .db, .exe, .dll, .lib and more)
+- Security headers
+- Content disposition control
+- Input validation to prevent directory traversal
 
-## Prerequisites
+## 部署方式
 
-- [Node.js](https://nodejs.org/) installed
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) installed: `npm install -g wrangler`
-- Cloudflare account with R2 storage and KV namespaces enabled
+### 方法一：通过 GitHub 在 Cloudflare 网页中部署（推荐）
 
-## Setup
+1. 将此项目代码上传到您的 GitHub 仓库
+2. 登录 Cloudflare 控制面板
+3. 选择 "Workers & Pages" -> "Create application" -> "Workers" -> "Connect to Git"
+4. 连接您的 GitHub 账户并选择仓库
+5. 在设置中配置环境变量和 R2/KV 绑定
+6. 点击 "Save and Deploy"
 
-### 1. Install Dependencies
+### 方法二：命令行部署
 
-```bash
-npm install
+运行 `wrangler deploy` 命令进行部署
+
+## 使用方法
+
+### 公开文件访问:
+```
+https://your-worker.your-subdomain.workers.dev/path/to/file
 ```
 
-### 2. Configure Environment
-
-1. Create R2 bucket in your Cloudflare account
-2. Create a KV namespace for rate limiting:
-   ```bash
-   wrangler kv:namespace create "RATE_LIMIT_KV"
-   ```
-   Note the namespace ID returned
-
-3. Update `wrangler.toml` with your values:
-   - `account_id`: Your Cloudflare Account ID
-   - `bucket_name`: Your R2 bucket name
-   - `id`: The KV namespace ID from step 2
-   - `preview_id`: A preview KV namespace ID (same as above or create a separate one)
-
-4. Set your secret key in `wrangler.toml`:
-   ```toml
-   PROXY_SECRET = "your-very-secure-secret-key-here"
-   ```
-
-### 3. Deploy the Worker
-
-```bash
-wrangler deploy
+### 受保护文件访问:
+```
+https://your-worker.your-subdomain.workers.dev/protected/path/to/file?secret=your-secret-key
 ```
 
-## Usage
+## Supported File Types
 
-### Public Access
-
-Access any file in your R2 bucket publicly:
-
-```
-https://your-worker.your-subdomain.workers.dev/my-folder/my-file.pdf
-```
-
-Note: Public access has rate limiting applied.
-
-### Protected Access
-
-Access protected files with authentication:
-
-```
-https://your-worker.your-subdomain.workers.dev/protected/my-folder/my-file.pdf?secret=your-secret-key
-```
-
-Protected files will be force-downloaded to prevent inline rendering.
-
-### File Validation
-
-The worker prevents directory traversal attacks by validating the object key.
-
-## Configuration
-
-You can adjust these environment variables in `wrangler.toml`:
-
-- `RATE_LIMIT_WINDOW`: Time window in seconds for rate limiting (default: 900 = 15 minutes)
-- `MAX_REQUESTS_PER_WINDOW`: Maximum requests per time window per IP (default: 100)
-- `PROXY_SECRET`: Secret key required for protected access
-
-## Security Features
-
-1. **Authentication**: Protected files require a secret key
-2. **Rate Limiting**: Limits requests per IP address
-3. **Input Validation**: Prevents directory traversal
-4. **Security Headers**: Includes common security headers
-5. **Content-Disposition**: Forces download for protected files
-
-## Examples
-
-### Accessing a public image:
-
-```
-https://r2-proxy.your-domain.workers.dev/images/photo.jpg
-```
-
-### Accessing a protected document:
-
-```
-https://r2-proxy.your-domain.workers.dev/protected/documents/contract.pdf?secret=your-secret-key
-```
-
-## Development
-
-To run the worker locally:
-
-```bash
-wrangler dev
-```
-
-## Troubleshooting
-
-- If you get 404 errors, ensure the file exists in your R2 bucket
-- If you get 401 errors for protected files, verify your secret key
-- If you get rate limit errors, wait for the window to reset or adjust the rate limit settings
+- Images: jpg, jpeg, png, gif, svg, webp, ico
+- Documents: pdf, doc, docx, txt, html, css, js
+- Video: mp4, webm, ogg
+- Audio: mp3, wav, flac, aac
+- Archives: zip, csv
+- Databases: sqlite, db
+- Executables: exe, dll, lib

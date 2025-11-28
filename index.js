@@ -191,7 +191,14 @@ function getContentType(objectKey) {
         'xls': 'application/vnd.ms-excel',
         'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'ppt': 'application/vnd.ms-powerpoint',
-        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        // Database files
+        'sqlite': 'application/vnd.sqlite3',
+        'db': 'application/octet-stream',
+        // Executable files
+        'exe': 'application/vnd.microsoft.portable-executable',
+        'dll': 'application/vnd.microsoft.portable-executable',
+        'lib': 'application/octet-stream'
     };
 
     return mimeTypes[extension] || 'application/octet-stream';

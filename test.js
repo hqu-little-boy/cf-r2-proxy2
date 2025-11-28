@@ -30,9 +30,15 @@ function runTests() {
     console.log('\n✓ All required files are present');
     console.log('\nThe Cloudflare R2 Proxy Worker project has been set up successfully!');
     console.log('\nTo deploy:');
-    console.log('1. Update wrangler.toml with your Cloudflare account details');
-    console.log('2. Create R2 bucket and KV namespace');
-    console.log('3. Run: wrangler deploy');
+    console.log('Option 1 - GitHub Web Deployment (Recommended):');
+    console.log('  1. Upload code to a GitHub repository');
+    console.log('  2. Connect to Cloudflare Workers via Git integration');
+    console.log('  3. Configure environment variables and bindings in the dashboard');
+    console.log('');
+    console.log('Option 2 - Command Line Deployment:');
+    console.log('  1. Update wrangler.toml with your Cloudflare account details');
+    console.log('  2. Create R2 bucket and KV namespace');
+    console.log('  3. Run: wrangler deploy');
     
     console.log('\nKey features implemented:');
     console.log('- Authentication via secret key for protected files');
