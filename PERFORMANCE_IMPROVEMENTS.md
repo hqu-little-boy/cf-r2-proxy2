@@ -1,8 +1,34 @@
-# Performance Improvements for Cloudflare R2 Proxy
+# Performance Improvements & Architecture Recommendations for Cloudflare R2 Proxy
 
-This document outlines the performance improvements made to enhance download speeds in the Cloudflare R2 proxy worker.
+This document outlines the performance improvements made to enhance download speeds in the Cloudflare R2 proxy worker, as well as important architectural considerations for large file downloads.
 
-## Key Improvements
+## Important Note: Cloudflare Workers Limitations
+
+**Cloudflare Workers have a hard timeout limit of 30 seconds for HTTP requests.** This means that any attempt to download very large files (like your 155MB APK) through a Worker will fail with timeout errors, regardless of any streaming optimizations.
+
+The errors you're seeing (`errorCode=22 响应状态不成功。状态=500`) are likely due to these timeout limitations. No amount of streaming optimization can fix this fundamental constraint.
+
+## Recommended Architecture for Large Files
+
+For large file downloads like your APK file, consider one of these approaches:
+
+### Option 1: Direct R2 Access (Recommended for large files)
+- Configure your R2 bucket for public access
+- Share direct R2 URLs with your users
+- Bypass the Worker entirely for large downloads
+- This eliminates the timeout issue completely
+
+### Option 2: Hybrid Approach
+- Use the Worker proxy for small files (under 50MB)
+- Redirect or provide direct R2 URLs for large files
+- The updated code now includes size information headers to help with this decision
+
+### Option 3: Chunked Download Client
+- Use a client that supports resumable downloads
+- Implement download in chunks that stay under the 30-second limit
+- The updated code provides range request support for this purpose
+
+## Key Improvements Made
 
 ### 1. Streaming Optimization
 - **Direct Body Streaming**: The response now streams directly from the R2 object body without intermediate buffering
@@ -23,28 +49,35 @@ This document outlines the performance improvements made to enhance download spe
 - **Optimized for Media**: Better support for video and audio streaming scenarios
 - **Proper Error Handling**: Returns 416 status for invalid range requests
 
-### 4. Additional Performance Enhancements
-- **Accept-Ranges Header**: Explicitly indicates support for range requests
-- **Content-Length Headers**: More accurate size information for better client handling
-- **Consistent Response Headers**: Optimized header handling for better performance
+### 4. Size Information & Large File Warnings
+- **File Size Headers**: The response now includes `x-content-size` and `x-content-size-human` headers
+- **Timeout Warnings**: Files over the recommended size threshold include a warning about potential timeout issues
+- **Large File Indicators**: The response includes `x-large-file` header for client-side processing
+- **Suggested Chunk Size**: Provides `x-suggested-chunk-size` for chunked download implementations
 
-## Expected Performance Benefits
+### 5. Environment Configuration
+- **Configurable Size Limit**: Set `MAX_FILE_SIZE` environment variable to control the threshold (defaults to 50MB)
+- **Flexible Deployment**: Adjust limits based on your specific requirements
 
-1. **Faster Initial Response Time**: Streaming begins immediately upon receiving the request
-2. **Better Large File Handling**: Reduced memory usage and faster transfer for large files
-3. **Reduced Bandwidth Usage**: Improved caching reduces repeated downloads
-4. **Enhanced Media Support**: Better streaming experience for video and audio content
-5. **Improved Error Handling**: More robust handling of edge cases
+## For Your Specific Use Case (APK Downloads)
+
+For your 155MB APK files, the recommended approach is:
+
+1. **Direct R2 Access**: Make your APK files publicly accessible in R2 and link directly to them
+2. **If you must use the proxy**: Implement a client that uses range requests to download in smaller chunks that don't exceed the 30-second timeout
+3. **Hybrid approach**: Use the worker for metadata, previews, or small files, but redirect to direct R2 access for large files
 
 ## Deployment Instructions
 
 1. Replace the existing `src/index.js` with the updated version
 2. Update your deployment using `npm run deploy` or `wrangler deploy`
-3. The improvements will be active immediately after deployment
+3. Optionally configure the `MAX_FILE_SIZE` environment variable (in bytes) via Cloudflare dashboard
+4. The improvements will be active immediately after deployment
 
 ## Testing Recommendations
 
-- Test with large files to verify streaming improvements
+- Test with small files to verify proxy functionality works correctly
 - Verify cache headers are working correctly in browser dev tools
 - Test range requests with video/audio files
-- Monitor download speeds compared to the previous version
+- Monitor that large file size warnings are properly included in responses
+- For large files, consider the architectural recommendations rather than expecting the proxy to handle them directly

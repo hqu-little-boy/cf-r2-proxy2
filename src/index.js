@@ -134,6 +134,23 @@ export default {
         headers.set('cache-control', 'public, max-age=2592000, stale-while-revalidate=604800');
       }
 
+      // Get file size and add informational headers
+      const fileSize = object.size;
+      headers.set('x-content-size', `${fileSize}`);
+      headers.set('x-content-size-human', `${(fileSize / (1024 * 1024)).toFixed(2)} MB`);
+
+      // Check if file size is larger than recommended for Cloudflare Workers to avoid timeouts
+      // Cloudflare Workers have a 30-second timeout limit which makes large file downloads problematic
+      const maxRecommendedSize = env.MAX_FILE_SIZE ? parseInt(env.MAX_FILE_SIZE) : 50 * 1024 * 1024; // Default to 50MB
+      if (fileSize > maxRecommendedSize) {
+        // Add warning header about potential timeout
+        headers.set('x-warning', `File size (${(fileSize / (1024 * 1024)).toFixed(2)} MB) exceeds recommended limit for Cloudflare Workers (${(maxRecommendedSize / (1024 * 1024)).toFixed(2)} MB). May experience timeouts.`);
+
+        // For large files, add a header that clients can use to implement better downloading strategies
+        headers.set('x-large-file', 'true');
+        headers.set('x-suggested-chunk-size', '10485760'); // 10MB chunks suggested
+      }
+
       // Handle range requests for partial content (useful for videos, large files)
       const rangeHeader = request.headers.get('range');
       if (rangeHeader) {
@@ -142,8 +159,8 @@ export default {
         const totalSize = object.size;
 
         const ranges = range.replace('bytes=', '').split('-');
-        const start = parseInt(ranges[0], 10);
-        const end = ranges[1] ? parseInt(ranges[1], 10) : totalSize - 1;
+        let start = parseInt(ranges[0], 10);
+        let end = ranges[1] ? parseInt(ranges[1], 10) : totalSize - 1;
 
         // Validate range request
         if (isNaN(start) || (ranges[1] && isNaN(end)) || start >= totalSize) {
@@ -153,31 +170,47 @@ export default {
           });
         }
 
-        const rangeStart = Math.max(0, start);
-        const rangeEnd = Math.min(end, totalSize - 1);
+        // Bound the range to the total size
+        start = Math.max(0, start);
+        end = Math.min(end, totalSize - 1);
 
         // Get the range from R2 object
-        const rangeResponse = await object.slice(rangeStart, rangeEnd + 1);
+        const rangeResponse = await object.slice(start, end + 1);
 
-        headers.set('content-range', `bytes ${rangeStart}-${rangeEnd}/${totalSize}`);
-        headers.set('content-length', `${rangeEnd - rangeStart + 1}`);
+        headers.set('content-range', `bytes ${start}-${end}/${totalSize}`);
+        headers.set('content-length', `${end - start + 1}`);
 
+        // For range requests, try to optimize with streaming
         return new Response(rangeResponse.body, {
           status: 206,
           headers,
         });
       }
 
-      // For full object requests, stream the response directly
+      // For full object requests, set content-length and stream directly
       headers.set('content-length', `${object.size}`);
 
       // Create a streaming response for better performance with large files
+      // Use the object.body directly for streaming
       return new Response(object.body, {
         headers,
       });
     } catch (error) {
       console.error(`R2 Error: ${error.message}`);
-      return new Response(`Error accessing R2: ${error.message}`, {
+      console.error(`Stack trace: ${error.stack}`);
+
+      // Return a more user-friendly error with more details
+      const errorMessage = `Error accessing R2: ${error.message}`;
+
+      // If it's a timeout-related error, provide specific guidance
+      if (error.message.includes('time') || error.message.includes('Timeout')) {
+        return new Response('Download timeout - file may be too large for this proxy. Consider direct R2 access or chunked downloading.', {
+          status: 504, // Gateway Timeout
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      }
+
+      return new Response(errorMessage, {
         status: 500,
         headers: { 'Content-Type': 'text/plain' }
       });
