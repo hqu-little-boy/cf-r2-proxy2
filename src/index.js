@@ -120,33 +120,58 @@ export default {
       }
 
       headers.set('etag', object.httpEtag);
-      headers.set('cache-control', 'public, max-age=31536000'); // Cache for 1 year
+      headers.set('accept-ranges', 'bytes');
+
+      // Improved cache control based on file type
+      if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'ico'].includes(fileExtension)) {
+        // Cache images for 1 year (31536000 seconds = 1 year)
+        headers.set('cache-control', 'public, max-age=31536000, immutable');
+      } else if (['css', 'js', 'woff', 'woff2', 'ttf', 'eot'].includes(fileExtension)) {
+        // Cache static assets for 1 year with revalidation
+        headers.set('cache-control', 'public, max-age=31536000, immutable');
+      } else {
+        // Cache other files for 1 month with revalidation
+        headers.set('cache-control', 'public, max-age=2592000, stale-while-revalidate=604800');
+      }
 
       // Handle range requests for partial content (useful for videos, large files)
-      if (request.headers.get('range')) {
-        const range = request.headers.get('range');
-
+      const rangeHeader = request.headers.get('range');
+      if (rangeHeader) {
         // Parse range header
-        const [start, end] = range.replace('bytes=', '').split('-').map(Number);
+        const range = rangeHeader;
         const totalSize = object.size;
 
-        // Get the range
-        const rangeStart = isNaN(start) ? 0 : start;
-        const rangeEnd = isNaN(end) ? Math.min(rangeStart + 999999, totalSize - 1) : end;
+        const ranges = range.replace('bytes=', '').split('-');
+        const start = parseInt(ranges[0], 10);
+        const end = ranges[1] ? parseInt(ranges[1], 10) : totalSize - 1;
 
+        // Validate range request
+        if (isNaN(start) || (ranges[1] && isNaN(end)) || start >= totalSize) {
+          return new Response('Range Not Satisfiable', {
+            status: 416,
+            headers: { 'Content-Range': `bytes */${totalSize}` }
+          });
+        }
+
+        const rangeStart = Math.max(0, start);
+        const rangeEnd = Math.min(end, totalSize - 1);
+
+        // Get the range from R2 object
         const rangeResponse = await object.slice(rangeStart, rangeEnd + 1);
-        const body = rangeResponse.body;
 
         headers.set('content-range', `bytes ${rangeStart}-${rangeEnd}/${totalSize}`);
         headers.set('content-length', `${rangeEnd - rangeStart + 1}`);
 
-        return new Response(body, {
+        return new Response(rangeResponse.body, {
           status: 206,
           headers,
         });
       }
 
-      // Return the full object
+      // For full object requests, stream the response directly
+      headers.set('content-length', `${object.size}`);
+
+      // Create a streaming response for better performance with large files
       return new Response(object.body, {
         headers,
       });
