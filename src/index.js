@@ -101,45 +101,20 @@ export default {
       // Create headers for the response
       const headers = new Headers();
 
-      // Copy relevant headers from the R2 object
-      object.writeHttpMetadata(headers);
-
-      // Determine file extension to set appropriate content type
-      const fileExtension = path.split('.').pop().toLowerCase();
-      if (MIME_TYPES[fileExtension]) {
-        headers.set('content-type', MIME_TYPES[fileExtension]);
-      } else {
-        // Default content type for unknown files
-        headers.set('content-type', 'application/octet-stream');
-      }
-
-      // Set content disposition to force download for executable and database files
-      const dangerousExtensions = ['exe', 'dll', 'lib', 'db', 'sqlite'];
-      if (dangerousExtensions.includes(fileExtension)) {
-        headers.set('content-disposition', 'attachment');
-      }
-
+      // Only set essential headers to reduce overhead
+      headers.set('content-type', object.httpMetadata?.contentType || 'application/octet-stream');
       headers.set('etag', object.httpEtag);
       headers.set('accept-ranges', 'bytes');
 
-      // Improved cache control based on file type
-      if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'ico'].includes(fileExtension)) {
-        // Cache images for 1 year (31536000 seconds = 1 year)
-        headers.set('cache-control', 'public, max-age=31536000, immutable');
-      } else if (['css', 'js', 'woff', 'woff2', 'ttf', 'eot'].includes(fileExtension)) {
-        // Cache static assets for 1 year with revalidation
-        headers.set('cache-control', 'public, max-age=31536000, immutable');
-      } else {
-        // Cache other files for 1 month with revalidation
-        headers.set('cache-control', 'public, max-age=2592000, stale-while-revalidate=604800');
-      }
+      // Set cache control - using a moderate cache time
+      headers.set('cache-control', 'public, max-age=604800'); // Cache for 1 week
 
       // Include file size information
       const fileSize = object.size;
       headers.set('x-content-size', `${fileSize}`);
       headers.set('x-content-size-human', `${(fileSize / (1024 * 1024)).toFixed(2)} MB`);
 
-      // Handle range requests for partial content (useful for large files and resumable downloads)
+      // Handle range requests for partial content (useful for large files)
       const rangeHeader = request.headers.get('range');
       if (rangeHeader) {
         // Parse range header
@@ -169,21 +144,19 @@ export default {
         headers.set('content-length', `${end - start + 1}`);
 
         // For range requests, return the partial content
-        // This allows large files to be downloaded in chunks
         return new Response(rangeResponse.body, {
           status: 206,
           headers,
         });
       }
 
-      // For full object requests, check if it's extremely large (over 100MB)
-      // We'll allow it but with a warning header and information for clients
-      if (fileSize > 100 * 1024 * 1024) { // Over 100MB
-        headers.set('x-warning', 'Large file: download may timeout. Client should implement range requests for reliability.');
-      }
-
-      // For full object requests, stream the response
+      // For full object requests, set content-length
       headers.set('content-length', `${object.size}`);
+
+      // For very large files, add a custom header to suggest client behavior
+      if (fileSize > 50 * 1024 * 1024) { // Over 50MB
+        headers.set('x-warning', 'Large file: use download manager with resume capability');
+      }
 
       // Create a streaming response
       return new Response(object.body, {
