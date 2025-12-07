@@ -134,24 +134,12 @@ export default {
         headers.set('cache-control', 'public, max-age=2592000, stale-while-revalidate=604800');
       }
 
-      // Get file size and add informational headers
+      // Include file size information
       const fileSize = object.size;
       headers.set('x-content-size', `${fileSize}`);
       headers.set('x-content-size-human', `${(fileSize / (1024 * 1024)).toFixed(2)} MB`);
 
-      // Check if file size is larger than recommended for Cloudflare Workers to avoid timeouts
-      // Cloudflare Workers have a 30-second timeout limit which makes large file downloads problematic
-      const maxRecommendedSize = env.MAX_FILE_SIZE ? parseInt(env.MAX_FILE_SIZE) : 50 * 1024 * 1024; // Default to 50MB
-      if (fileSize > maxRecommendedSize) {
-        // Add warning header about potential timeout
-        headers.set('x-warning', `File size (${(fileSize / (1024 * 1024)).toFixed(2)} MB) exceeds recommended limit for Cloudflare Workers (${(maxRecommendedSize / (1024 * 1024)).toFixed(2)} MB). May experience timeouts.`);
-
-        // For large files, add a header that clients can use to implement better downloading strategies
-        headers.set('x-large-file', 'true');
-        headers.set('x-suggested-chunk-size', '10485760'); // 10MB chunks suggested
-      }
-
-      // Handle range requests for partial content (useful for videos, large files)
+      // Handle range requests for partial content (useful for large files and resumable downloads)
       const rangeHeader = request.headers.get('range');
       if (rangeHeader) {
         // Parse range header
@@ -180,18 +168,24 @@ export default {
         headers.set('content-range', `bytes ${start}-${end}/${totalSize}`);
         headers.set('content-length', `${end - start + 1}`);
 
-        // For range requests, try to optimize with streaming
+        // For range requests, return the partial content
+        // This allows large files to be downloaded in chunks
         return new Response(rangeResponse.body, {
           status: 206,
           headers,
         });
       }
 
-      // For full object requests, set content-length and stream directly
+      // For full object requests, check if it's extremely large (over 100MB)
+      // We'll allow it but with a warning header and information for clients
+      if (fileSize > 100 * 1024 * 1024) { // Over 100MB
+        headers.set('x-warning', 'Large file: download may timeout. Client should implement range requests for reliability.');
+      }
+
+      // For full object requests, stream the response
       headers.set('content-length', `${object.size}`);
 
-      // Create a streaming response for better performance with large files
-      // Use the object.body directly for streaming
+      // Create a streaming response
       return new Response(object.body, {
         headers,
       });
@@ -204,7 +198,7 @@ export default {
 
       // If it's a timeout-related error, provide specific guidance
       if (error.message.includes('time') || error.message.includes('Timeout')) {
-        return new Response('Download timeout - file may be too large for this proxy. Consider direct R2 access or chunked downloading.', {
+        return new Response('Download timeout - for large files, please use range requests (Resume capability) in your download client.', {
           status: 504, // Gateway Timeout
           headers: { 'Content-Type': 'text/plain' }
         });

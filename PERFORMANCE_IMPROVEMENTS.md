@@ -1,32 +1,10 @@
-# Performance Improvements & Architecture Recommendations for Cloudflare R2 Proxy
+# Performance Improvements & Large File Solutions for Cloudflare R2 Proxy
 
-This document outlines the performance improvements made to enhance download speeds in the Cloudflare R2 proxy worker, as well as important architectural considerations for large file downloads.
+This document outlines the performance improvements made to enhance download speeds in the Cloudflare R2 proxy worker and explains how to download large files within the Cloudflare Workers platform constraints.
 
-## Important Note: Cloudflare Workers Limitations
+## Understanding Cloudflare Workers Limitations
 
-**Cloudflare Workers have a hard timeout limit of 30 seconds for HTTP requests.** This means that any attempt to download very large files (like your 155MB APK) through a Worker will fail with timeout errors, regardless of any streaming optimizations.
-
-The errors you're seeing (`errorCode=22 响应状态不成功。状态=500`) are likely due to these timeout limitations. No amount of streaming optimization can fix this fundamental constraint.
-
-## Recommended Architecture for Large Files
-
-For large file downloads like your APK file, consider one of these approaches:
-
-### Option 1: Direct R2 Access (Recommended for large files)
-- Configure your R2 bucket for public access
-- Share direct R2 URLs with your users
-- Bypass the Worker entirely for large downloads
-- This eliminates the timeout issue completely
-
-### Option 2: Hybrid Approach
-- Use the Worker proxy for small files (under 50MB)
-- Redirect or provide direct R2 URLs for large files
-- The updated code now includes size information headers to help with this decision
-
-### Option 3: Chunked Download Client
-- Use a client that supports resumable downloads
-- Implement download in chunks that stay under the 30-second limit
-- The updated code provides range request support for this purpose
+**Cloudflare Workers have a hard timeout limit of 30 seconds for HTTP requests.** This affects how large files can be downloaded through the proxy. However, there's a solution using range requests (byte-range downloads).
 
 ## Key Improvements Made
 
@@ -46,38 +24,49 @@ For large file downloads like your APK file, consider one of these approaches:
 ### 3. Improved Range Request Handling
 - **Better Validation**: More robust range request validation prevents errors
 - **Accurate Headers**: Correct content-range and content-length headers for partial content
-- **Optimized for Media**: Better support for video and audio streaming scenarios
+- **Optimized for Large Files**: Now supports resumable downloads using HTTP range requests
 - **Proper Error Handling**: Returns 416 status for invalid range requests
+- **Added `accept-ranges: bytes` header**: Tells clients that range requests are supported
 
-### 4. Size Information & Large File Warnings
+### 4. Size Information Headers
 - **File Size Headers**: The response now includes `x-content-size` and `x-content-size-human` headers
-- **Timeout Warnings**: Files over the recommended size threshold include a warning about potential timeout issues
-- **Large File Indicators**: The response includes `x-large-file` header for client-side processing
-- **Suggested Chunk Size**: Provides `x-suggested-chunk-size` for chunked download implementations
+- **Helps clients make download decisions**
 
-### 5. Environment Configuration
-- **Configurable Size Limit**: Set `MAX_FILE_SIZE` environment variable to control the threshold (defaults to 50MB)
-- **Flexible Deployment**: Adjust limits based on your specific requirements
+## Solution for Large File Downloads (155MB APK)
 
-## For Your Specific Use Case (APK Downloads)
+Your 155MB APK file can now be downloaded through the proxy using **range requests**, which allow the file to be downloaded in smaller chunks. This works by:
 
-For your 155MB APK files, the recommended approach is:
+1. The client (like aria2c) makes requests for specific byte ranges of the file
+2. Each range request is smaller and completes in under 30 seconds
+3. The client assembles the chunks into the complete file
 
-1. **Direct R2 Access**: Make your APK files publicly accessible in R2 and link directly to them
-2. **If you must use the proxy**: Implement a client that uses range requests to download in smaller chunks that don't exceed the 30-second timeout
-3. **Hybrid approach**: Use the worker for metadata, previews, or small files, but redirect to direct R2 access for large files
+## How to Download Large Files
+
+### For aria2c users (like your example):
+```bash
+aria2c https://download-test.21645851.xyz/setup/BiliBiliLiveRobot-0.1.1.apk -x16 -j16
+```
+
+This command should now work because aria2c automatically uses range requests when it detects the server supports them (with the `accept-ranges: bytes` header).
+
+### Alternative command-line approaches:
+```bash
+# With wget - the -c flag enables continue capability (range requests)
+wget -c https://download-test.21645851.xyz/setup/BiliBiliLiveRobot-0.1.1.apk
+
+# With curl - the -C flag enables continue capability
+curl -C - -O https://download-test.21645851.xyz/setup/BiliBiliLiveRobot-0.1.1.apk
+```
 
 ## Deployment Instructions
 
 1. Replace the existing `src/index.js` with the updated version
 2. Update your deployment using `npm run deploy` or `wrangler deploy`
-3. Optionally configure the `MAX_FILE_SIZE` environment variable (in bytes) via Cloudflare dashboard
-4. The improvements will be active immediately after deployment
+3. The improvements will be active immediately after deployment
 
 ## Testing Recommendations
 
-- Test with small files to verify proxy functionality works correctly
-- Verify cache headers are working correctly in browser dev tools
-- Test range requests with video/audio files
-- Monitor that large file size warnings are properly included in responses
-- For large files, consider the architectural recommendations rather than expecting the proxy to handle them directly
+- Test with aria2c, wget -c, or curl -C to verify range request support
+- Check that `accept-ranges: bytes` header is present in responses
+- Verify that file size information headers are included
+- Monitor download progress with tools that show range request usage
